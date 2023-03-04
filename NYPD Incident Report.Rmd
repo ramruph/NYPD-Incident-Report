@@ -1,0 +1,172 @@
+---
+title: "NYPD Shooting Report"
+author: "Harishawn Ramrup"
+date: "2023-03-01"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+
+
+## R Markdown
+
+Importing Necessary Packages 
+``` {r}
+library(tidyverse)
+library(lubridate)
+library(dplyr)
+library(ggplot2)
+library(nnet)
+# Not Libraries used in class
+library(osmdata)
+#library(ggmap)
+
+```
+
+#### Note
+I had errors knitting -> library(ggmap)
+I left the code outside of a R chunk for your references
+
+
+# Data Exploration
+
+Importing police data set gathered from Data.Gov. The dataset goes back to 2006 up to 2021. 
+
+``` {r}
+police_df <- read_csv("https://data.cityofnewyork.us/api/views/833y-fsy8/rows.csv?accessType=DOWNLOAD")
+```
+
+``` {r}
+glimpse(police_df)
+
+```
+
+
+Summarize Data to see where I would need to clean up 
+``` {r}
+summary(police_df)
+```
+
+# ETL
+
+ETL Date formatting and remove unneeded columns from the dataframe 
+``` {r Data ETL}
+#Converting string elements into Date and Time elements
+police_df$OCCUR_DATE <- mdy(police_df$OCCUR_DATE)
+
+# dropping unneeded columns
+police_df<- subset(police_df, select= -c(X_COORD_CD, Y_COORD_CD))
+
+```
+
+Checking Dataset after ETL to ensure desired results
+``` {r}
+summary(police_df)
+```
+
+# Groupings / Aggregations
+
+Groupings
+```{r Grouping the data}
+nypd_incident_by_date <- police_df %>%
+    group_by(month=month(OCCUR_DATE), year=year(OCCUR_DATE)) %>%
+    summarize(count = n())
+
+```
+
+Create Grouping for Graphs by Month
+
+``` {r Group Incident by Month}
+nypd_incident_by_month <- police_df %>%
+group_by(month=month(OCCUR_DATE)) %>%
+summarize(count = n())
+
+
+```
+
+Create Grouping for Logistic Model
+```{r}
+
+# Create data group for Model
+murdered_data <- police_df %>% 
+  select(VIC_SEX, STATISTICAL_MURDER_FLAG, BORO, PERP_RACE) %>% 
+  filter(!is.na(VIC_SEX), !is.na(STATISTICAL_MURDER_FLAG))
+
+```
+
+# Graphs
+
+Graph shootings by month
+
+``` {r Graph of Month shootings}
+ggplot(nypd_incident_by_month, aes(x=month, y = count)) +
+geom_bar(stat='identity', fill = "steelblue") +
+scale_x_continuous(breaks=1:12, labels = month.name) +
+labs( title = "NYPD Shooting on Months") +
+theme(axis.text.x = element_text(angle = 90))
+
+```
+
+Graph shootings through the years
+``` {r Graph for Shootings through years}
+ggplot(nypd_incident_by_date, aes(x=month, y = count, group = year, color=year)) +
+    geom_line() +
+    scale_x_continuous(breaks=1:12, labels = month.name) +
+    labs( title = "NYPD Shooting Through the Years") +
+    theme(axis.text.x = element_text(angle = 90))
+
+```
+From the graph above there is a significant increase in shootings in the Summer months 2020 and beyond. The levels pre 2010 shootings incidents where also higher than shootings that occured post 2010 with the exception of 2020. In the months of June, July, and August you can identify a massive uptick in shootings that are reported. In the winter months the averages are lower with Feburary having the least reported number of incidents in respect to other months
+
+
+
+Here we look at the victim race per Borough
+```{r}
+ggplot(data = police_df, aes(x = BORO, fill = VIC_RACE)) +
+  geom_bar() +
+  labs(title = "Incidents by Victim Race and Borough", x = "Borough", y = "Count", fill = "Victim Race", angel=90) +
+  theme(axis.text.x = element_text(angle = 90))
+
+
+```
+From this graph we can see Brooklyn has the highest number of Victims who were Black comparatively to the other boroughs while also having the most number of incidents overall. 
+
+### Map of NY City and shootings 
+Graph shootings in relation to where they occurred on a map of the City
+
+``` 
+library(ggmap)
+
+# Get a map of New York City using ggmap
+nyc_map <- get_map(getbb("New York City"), source= 'stamen')
+
+# Plot the shootings on the map using geom_point
+ggmap(nyc_map) +
+  geom_point(data = police_df, aes(x = Longitude, y = Latitude), alpha = 0.5, color = "red")
+```
+
+
+
+# Model
+
+
+This model uses the Murder Flag as dependent and determines if the sex or the victim and borough can model if the shooting resulted in Murder
+```{r}
+
+# Build the logistic regression model
+model <- lm(STATISTICAL_MURDER_FLAG ~ VIC_SEX + BORO + PERP_RACE, data=murdered_data)
+
+# Print the summary of the model
+summary(model)
+
+
+```
+
+# Results of Model
+Overall, this model suggests that there are some significant relationships between VIC_SEX, BORO, PERP_RACE and STATISTICAL_MURDER_FLAG,
+but the R-squared value is very low, which suggests that the model explains only a small amount of the variation in the dependent variable (STATISTICAL_MURDER_FLAG). Including additional features can narrow down this relationship and possibly improve the R-Squared Value.
+
+# Biases
+
+The biases that could be visible in this data set is a lack of reporting of actual. With the increase of public outrage in the excess forces that some police departments have been conducting in and with a growing social distress, departments may be more inclined to not reporting actual shootings or to try to improve public image and may lead to under reporting of shootings. In 2021, around July and August you can see an increase in shootings which is what sparked my interest in looking to if race had an effect in that. This also plays into my own bias, as I had a pre-disposition on the topic because of current events and social media.
