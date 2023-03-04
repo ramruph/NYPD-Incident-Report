@@ -8,7 +8,6 @@ output:
 ---
 
 
-
 ## R Markdown
 
 Importing Necessary Packages 
@@ -19,7 +18,7 @@ library(dplyr)
 library(ggplot2)
 library(nnet)
 # Not Libraries used in class
-library(osmdata)
+#library(osmdata)
 #library(ggmap)
 
 ```
@@ -65,7 +64,7 @@ Checking Dataset after ETL to ensure desired results
 summary(police_df)
 ```
 
-# Groupings / Aggregations
+# Groupings / Aggregations 
 
 Groupings
 ```{r Grouping the data}
